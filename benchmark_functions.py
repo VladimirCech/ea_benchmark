@@ -59,7 +59,7 @@ def styblinski_tang(x):
     return 0.5 * sum(i ** 4 - 16 * i ** 2 + 5 * i for i in x)
 
 
-# 10. Matyas
+# 10. Matyas #####################################
 def matyas_general(x):
     sum_squares = sum(i ** 2 for i in x)
     sum_products = sum(x[i] * x[i + 1] for i in range(len(x) - 1))
@@ -80,7 +80,7 @@ def three_hump_camel_general(x):
     return sum_terms
 
 
-# 13. Easom
+# 13. Easom ??????????
 def easom_general(x):
     product_terms = 1
     for i in range(len(x) - 1):
@@ -89,7 +89,7 @@ def easom_general(x):
     return product_terms
 
 
-# 14. Cross-in-tray
+# 14. Cross-in-tray ######################
 def cross_in_tray_general(x):
     product_terms = 1
     for i in range(len(x) - 1):
@@ -98,7 +98,7 @@ def cross_in_tray_general(x):
     return product_terms
 
 
-# 15. Six-hump camel
+# 15. Six-hump camel ????????
 def six_hump_camel_back_general(x):
     sum_terms = sum((4 - 2.1 * x[i] ** 2 + x[i] ** 4 / 3) * x[i] ** 2 + x[i] *
                     x[i + 1] + (4 * x[i + 1] ** 2 - 4) * x[i + 1] ** 2 for i in range(len(x) - 1))
@@ -112,14 +112,14 @@ def drop_wave_general(x):
     return sum_terms
 
 
-# 17. Bukin_n6
+# 17. Bukin_n6 ??????????
 def bukin_n6_general(x):
     sum_terms = sum(100 * np.sqrt(abs(x[i + 1] - 0.01 * x[i] ** 2)) +
                     0.01 * abs(x[i] + 10) for i in range(len(x) - 1))
     return sum_terms
 
 
-# 18. Goldstein-price
+# 18. Goldstein-price ????
 def goldstein_price_general(x):
     sum_terms = sum((1 + (x[i] + x[i + 1] + 1) ** 2 * (
             19 - 14 * x[i] + 3 * x[i] ** 2 - 14 * x[i + 1] + 6 * x[i] * x[i + 1] + 3 * x[i + 1] ** 2)) * (30 + (
@@ -128,43 +128,43 @@ def goldstein_price_general(x):
     return sum_terms
 
 
-# 19. De Jong f4
+# 19. De Jong f4 ?????
 def de_jong_f4(x):
     return sum((i + 1) * x_i ** 4 for i, x_i in enumerate(x))
 
 
-# 20. Schaffer n4
+# 20. Schaffer n4 #########
 def schaffer_n4(x):
     return sum(
         0.5 + (np.sin(np.sqrt(x[i] ** 2 + x[i + 1] ** 2)) ** 2 - 0.5) / (1 + 0.001 * (x[i] ** 2 + x[i + 1] ** 2)) ** 2
         for i in range(len(x) - 1))
 
 
-# 21. Salomon
+# 21. Salomon ????????
 def salomon(x):
     r = np.sqrt(sum(i ** 2 for i in x))
     return 1 - np.cos(2 * np.pi * r) + 0.1 * r
 
 
-# 22. Schaffer n2
+# 22. Schaffer n2 ##########
 def schaffer_n2(x):
     return sum(
         0.5 + (np.sin(x[i] ** 2 - x[i + 1] ** 2) ** 2 - 0.5) / (1 + 0.001 * (x[i] ** 2 - x[i + 1] ** 2)) ** 2 for i in
         range(len(x) - 1))
 
 
-# 23. Sine-Envelope Sine-Wave
+# 23. Sine-Envelope Sine-Wave ##########
 def sine_envelope_sine_wave(x):
     return sum(
         0.5 + (np.sin(np.sqrt(x[i] ** 2 + x[i + 1] ** 2)) ** 2 - 0.5) / (1 + 0.001 * (x[i] ** 2 + x[i + 1] ** 2)) ** 2
         for i in range(len(x) - 1))
 
 
-# 24. Modified-Exponential
+# 24. Modified-Exponential ########
 def modified_exponential(x):
     return -np.exp(-0.5 * sum(i ** 2 for i in x))
 
 
-# 25. Modofied Bent Cigar
+# 25. Modofied Bent Cigar ########
 def modified_bent_cigar(x):
     return x[0] ** 2 + 10 ** 6 * sum(i ** 2 for i in x[1:])
