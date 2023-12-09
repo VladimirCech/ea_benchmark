@@ -161,23 +161,23 @@ def saddle(x):
 
 
 # 21. Ellipse
-def ellipse( x ):
+def ellipse(x):
     x = np.asarray_chkfinite(x)
-    return mean( (1 - x) **2 )  + 100 * mean( np.diff(x) **2 )
+    return mean((1 - x) ** 2) + 100 * mean(np.diff(x) ** 2)
 
 
-# 22. Salomon  
+# 22. Salomon
 def salomon(x):
     r = np.sqrt(sum(x**2))
     return 1 - np.cos(2 * np.pi * r) + 0.1 * r
 
 
-# 23. Sum of Different Powers 
+# 23. Sum of Different Powers
 def sum_of_different_powers(x):
-    return sum(abs(x_i)**(i+1) for i, x_i in enumerate(x))
+    return sum(abs(x_i) ** (i + 1) for i, x_i in enumerate(x))
 
 
-# 24. Alpine 
+# 24. Alpine
 def alpine_function(x):
     return sum(abs(x_i * np.sin(x_i) + 0.1 * x_i) for x_i in x)
 
