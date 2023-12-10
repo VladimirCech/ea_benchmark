@@ -63,18 +63,23 @@ def styblinski_tang(x):
     return 0.5 * sum(i**4 - 16 * i**2 + 5 * i for i in x)
 
 
-# 10. Power-Sum ###
-def powersum(x, b=[8, 18, 44, 114]):  # power.m
-    x = np.asarray_chkfinite(x)
+# 10. Expanded Griewank-Rosenbrock
+def f8(x):
+    return 1/4000 * x**2 - np.cos(x) + 1
+
+def f2(x0, x1):
+    return 100 * (x1 - x0**2)**2 + (x0 - 1)**2
+
+def expanded_griewank_rosenbrock(x):
     n = len(x)
     s = 0
-    for k in range(1, n + 1):
-        bk = b[min(k - 1, len(b) - 1)]  # ?
-        s += (sum(x**k) - bk) ** 2  # dim 10 huge, 100 overflows
+    for i in range(n-1):
+        s += f8(f2(x[i], x[i+1]))
     return s
 
 
-# 11. Booth
+
+# 11. Booth ###
 def booth_general(x):
     part1 = sum((x[i] + 2 * x[i + 1] - 7) ** 2 for i in range(len(x) - 1))
     part2 = sum((2 * x[i] + x[i + 1] - 5) ** 2 for i in range(len(x) - 1))
@@ -128,7 +133,7 @@ def drop_wave_general(x):
     return sum_terms
 
 
-# 17. Perm ###
+# 17. Perm 
 def perm(x, b=0.5):
     x = np.asarray_chkfinite(x)
     n = len(x)
@@ -137,7 +142,7 @@ def perm(x, b=0.5):
     return mean([mean((j**k + b) * (xbyj**k - 1)) ** 2 for k in j / n])
 
 
-# 18. Michalewicz ####
+# 18. Michalewicz 
 def michalewicz(x):  # mich.m
     x = np.asarray_chkfinite(x)
     n = len(x)
@@ -182,6 +187,6 @@ def alpine_function(x):
     return sum(abs(x_i * np.sin(x_i) + 0.1 * x_i) for x_i in x)
 
 
-# 25. Modofied Bent Cigar ########
+# 25. Modified Bent Cigar
 def modified_bent_cigar(x):
     return x[0] ** 2 + 10**6 * sum(i**2 for i in x[1:])
