@@ -1,4 +1,5 @@
 from benchmark_functions import *
+from concurrent.futures import ProcessPoolExecutor
 
 lower_bound = -100
 upper_bound = 101
@@ -12,6 +13,7 @@ test_functions = [
     levy,
     schwefel,
     zakharov,
+    styblinski_tang,
     expanded_griewank_rosenbrock,
     booth_general,
     three_hump_camel_general,
@@ -21,6 +23,7 @@ test_functions = [
     drop_wave_general,
     perm,
     michalewicz,
+    dixonprice,
     saddle,
     ellipse,
     salomon,
@@ -117,15 +120,36 @@ def de_best_1_bin(func, dim, pop_size, F=0.8, CR=0.9):
     return population[best_idx]
 
 
-dim_count = 5
+dim_count = 10
 pop_count = 20
 
-print("----------------- DE RAND/1/BIN -----------------")
+def evaluate_de_rand_1_bin(function, dim_count, pop_count):
+    return de_rand_1_bin(function, dim_count, pop_count), function.__name__
 
-for x, function in enumerate(test_functions):
-    print(f"{x}.", de_rand_1_bin(function, dim_count, pop_count), function.__name__)
+def evaluate_de_best_1_bin(function, dim_count, pop_count):
+    return de_best_1_bin(function, dim_count, pop_count), function.__name__
 
-print("----------------- DE BEST/1/BIN -----------------")
 
-for x, function in enumerate(test_functions):
-    print(f"{x}.",de_best_1_bin(function, dim_count, pop_count), function.__name__)
+if __name__ == '__main__':
+
+    print("----------------- DE RAND/1/BIN -----------------")
+
+    # for x, function in enumerate(test_functions):
+        # print(f"{x}.", de_rand_1_bin(function, dim_count, pop_count), function.__name__)
+
+    with ProcessPoolExecutor() as executor:
+        futures = [executor.submit(evaluate_de_rand_1_bin, function, dim_count, pop_count) for function in test_functions]
+        for x, future in enumerate(futures):
+            result, name = future.result()
+            print(f"{x}. {result} {name}")
+
+    print("----------------- DE BEST/1/BIN -----------------")
+
+    with ProcessPoolExecutor() as executor:
+        futures = [executor.submit(evaluate_de_best_1_bin, function, dim_count, pop_count) for function in test_functions]
+        for x, future in enumerate(futures):
+            result, name = future.result()
+            print(f"{x}. {result} {name}")
+
+    # for x, function in enumerate(test_functions):
+    #     print(f"{x}.",de_best_1_bin(function, dim_count, pop_count), function.__name__)

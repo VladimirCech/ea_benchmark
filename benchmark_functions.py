@@ -79,7 +79,7 @@ def expanded_griewank_rosenbrock(x):
 
 
 
-# 11. Booth ###
+# 11. Booth
 def booth_general(x):
     part1 = sum((x[i] + 2 * x[i + 1] - 7) ** 2 for i in range(len(x) - 1))
     part2 = sum((2 * x[i] + x[i + 1] - 5) ** 2 for i in range(len(x) - 1))
@@ -150,7 +150,7 @@ def michalewicz(x):  # mich.m
     return -sum(sin(x) * sin(j * x**2 / pi) ** (2 * 0.5))
 
 
-# 19. Saddle
+# 19. Dixon-Price
 def dixonprice(x):  # dp.m
     x = np.asarray_chkfinite(x)
     n = len(x)
