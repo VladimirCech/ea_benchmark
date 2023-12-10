@@ -78,7 +78,7 @@ def de_rand_1_bin(func, dim, pop_size, F=0.8, CR=0.9):
     return population[best_idx]
 
 
-def de_best_1_bin(func, dim, pop_size, F=0.8, CR=0.9):
+def de_best_1_bin(func, dim, pop_size, F=0.5, CR=0.9):
     population = generate_population(pop_size, dim)
     population = np.array(population)
 
@@ -120,6 +120,54 @@ def de_best_1_bin(func, dim, pop_size, F=0.8, CR=0.9):
     return population[best_idx]
 
 
+def pso(func, dim, pop_size, c1=1.49618, c2=1.49618, w=0.7298):
+    # Inicializace populace (hejna)
+    population = generate_population(pop_size, dim)
+    population = np.array(population, dtype=np.float64)
+    velocity = np.random.uniform(-abs(upper_bound - lower_bound), abs(upper_bound - lower_bound), (pop_size, dim))
+
+    # Inicializace osobních a globálních nejlepších hodnot
+    personal_best = population.copy()
+    personal_best_scores = np.array([func(ind) for ind in population])
+    global_best_idx = np.argmin(personal_best_scores)
+    global_best = population[global_best_idx]
+
+    max_gen = dim * 2000
+
+    # Hlavní smyčka algoritmu PSO
+    for gen in range(max_gen):
+        for i in range(pop_size):
+            # Aktualizace rychlosti
+            r1, r2 = np.random.rand(dim), np.random.rand(dim)
+            velocity[i] = w * velocity[i] + c1 * r1 * (personal_best[i] - population[i]) + c2 * r2 * (global_best - population[i])
+
+            # Aktualizace pozice
+            population[i] += velocity[i]
+
+            # Kontrola hranic a upravení metodou odrazu
+            for j in range(dim):
+                if population[i, j] < lower_bound:
+                    population[i, j] = lower_bound + abs(population[i, j] - lower_bound)
+                    velocity[i, j] *= -1
+                elif population[i, j] > upper_bound:
+                    population[i, j] = upper_bound - abs(population[i, j] - upper_bound)
+                    velocity[i, j] *= -1
+
+            # Hodnocení a aktualizace osobních a globálních nejlepších hodnot
+            score = func(population[i])
+            if score < personal_best_scores[i]:
+                personal_best[i] = population[i]
+                personal_best_scores[i] = score
+
+            # Aktualizace globálního nejlepšího
+            if score < func(global_best):
+                global_best = population[i]
+
+    # Nalezení a vrácení nejlepšího řešení
+    best_idx = np.argmin(personal_best_scores)
+    return population[best_idx]
+
+
 dim_count = 10
 pop_count = 20
 
@@ -133,6 +181,9 @@ def evaluate_de_best_1_bin(function, dim_count, pop_count):
 if __name__ == '__main__':
 
     print("----------------- DE RAND/1/BIN -----------------")
+
+    # for x, function in enumerate(test_functions):
+    #     print(f"{x}.", pso(function, dim_count, pop_count), function.__name__)
 
     # for x, function in enumerate(test_functions):
         # print(f"{x}.", de_rand_1_bin(function, dim_count, pop_count), function.__name__)
