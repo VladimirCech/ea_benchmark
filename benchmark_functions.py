@@ -140,16 +140,3 @@ functions: List[Callable[[np.ndarray], float]] = [
     michalewicz_modified,
     schwefel_1_2,
 ]
-
-# Example usage
-if __name__ == "__main__":
-    dimensions = [2, 10, 20]
-    for dim in dimensions:
-        print(f"\nTesting with dimension: {dim}")
-        x = np.random.uniform(-100, 100, dim)  # Náhodný vektor v daném rozsahu
-        for func in functions:
-            try:
-                result = func(x)
-                print(f"{func.__name__}: {result}")
-            except Exception as e:
-                print(f"{func.__name__}: Error - {e}")
