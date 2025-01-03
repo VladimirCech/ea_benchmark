@@ -143,7 +143,6 @@ functions: List[Callable[[np.ndarray], float]] = [
 
 # Example usage
 if __name__ == "__main__":
-    # Definuj dimenzi podle funkce
     dimensions = [2, 10, 20]
     for dim in dimensions:
         print(f"\nTesting with dimension: {dim}")
