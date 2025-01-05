@@ -1,250 +1,326 @@
-from benchmark_functions import *
-from concurrent.futures import ProcessPoolExecutor
+""" Main script for running all algorithms on all benchmark functions. """
 
-lower_bound = -100
-upper_bound = 101
+# optimization_algorithms.py
 
-funcs = [
-    sphere,
-    rastrigin,
-    ackley,
-    rosenbrock,
-    griewank,
-    levy,
-    schwefel,
-    zakharov,
-    styblinski_tang,
-    expanded_griewank_rosenbrock,
-    booth_general,
-    three_hump_camel_general,
-    sum2,
-    powell,
-    trid,
-    drop_wave_general,
-    perm,
-    michalewicz,
-    dixonprice,
-    saddle,
-    ellipse,
-    salomon,
-    sum_of_different_powers,
-    alpine_function,
-    modified_bent_cigar,
-]
+from typing import Callable, List, Tuple, Dict
+import numpy as np
+from benchmark_functions import functions
+import multiprocessing
+import pandas as pd
+from scipy.stats import friedmanchisquare
 
+# Parametry algoritmů
+DIMENSIONS = [2, 10, 20]
+POP_SIZES = {2: 10, 10: 20, 20: 40}
+FEs = {2: 2000 * 2, 10: 2000 * 10, 20: 2000 * 20}
+REPEATS = 20
 
-def generate_population(count, dimension):
-    population = []
-    for i in range(count):
-        population.append(list(np.random.randint(low=lower_bound, high=upper_bound, size=dimension)))
-    return population
+LOWER_BOUND = -100.0
+UPPER_BOUND = 100.0
 
+# DE parameters
+DE_RAND_1_BIN_F = 0.8
+DE_RAND_1_BIN_CR = 0.9
+DE_BEST_1_BIN_F = 0.5
+DE_BEST_1_BIN_CR = 0.9
 
-def de_rand_1_bin(func, dim, pop_size, F=0.8, CR=0.9):
+# PSO parameters
+PSO_C1 = 1.49618
+PSO_C2 = 1.49618
+PSO_W = 0.7298
+
+def generate_population(pop_size: int, dimension: int) -> np.ndarray:
+    """Generuje počáteční populaci s plovoucí desetinnou čárkou."""
+    return np.random.uniform(low=LOWER_BOUND, high=UPPER_BOUND, size=(pop_size, dimension))
+
+def de_rand_1_bin(
+    func: Callable[[np.ndarray], float],
+    dim: int,
+    pop_size: int,
+    F: float = DE_RAND_1_BIN_F,
+    CR: float = DE_RAND_1_BIN_CR,
+    max_gen: int = 1000
+) -> Tuple[np.ndarray, float]:
+    """Differential Evolution DE/rand/1/bin"""
     population = generate_population(pop_size, dim)
-    population = np.array(population)
+    fitness = np.array([func(ind) for ind in population])
 
-    max_gen = dim * 2000
-
-    # Hlavní smyčka algoritmu
     for gen in range(max_gen):
-        for i in range(len(population)):
-            # Výběr tří různých indexů (r1, r2, r3) náhodně z populace
-            candidates = list(range(0, i)) + list(range(i + 1, pop_size))
-            indexes = np.random.choice(candidates, 3, replace=False)
-            r1, r2, r3 = population[indexes[0]], population[indexes[1]], population[indexes[2]]
+        for i in range(pop_size):
+            # Výběr tří různých jedinců
+            indices = list(range(pop_size))
+            indices.remove(i)
+            r1, r2, r3 = population[np.random.choice(indices, 3, replace=False)]
 
             # Mutace
             mutant = r1 + F * (r2 - r3)
+            mutant = np.clip(mutant, LOWER_BOUND, UPPER_BOUND)
 
             # Binární křížení
-            trial = np.copy(population[i])
-            for j in range(dim):
-                if np.random.rand() < CR:
-                    trial[j] = mutant[j]
+            cross_points = np.random.rand(dim) < CR
+            if not np.any(cross_points):
+                cross_points[np.random.randint(0, dim)] = True
+            trial = np.where(cross_points, mutant, population[i])
 
-                # Kontrola hranic a upravení metodou odrazu
-                if trial[j] < lower_bound:
-                    trial[j] = lower_bound + abs(trial[j] - lower_bound)
-                elif trial[j] > upper_bound:
-                    trial[j] = upper_bound - abs(trial[j] - upper_bound)
+            # Vyhodnocení trial jedince
+            trial_fitness = func(trial)
 
-            # Selekcí
-            if func(trial) < func(population[i]):
+            # Selekce
+            if trial_fitness < fitness[i]:
                 population[i] = trial
+                fitness[i] = trial_fitness
 
-    # Nalezení a vrácení nejlepšího řešení
-    best_idx = np.argmin([func(ind) for ind in population])
-    return population[best_idx]
+    # Nalezení nejlepšího jedince
+    best_idx = np.argmin(fitness)
+    return population[best_idx], fitness[best_idx]
 
-
-def de_best_1_bin(func, dim, pop_size, F=0.5, CR=0.9):
+def de_best_1_bin(
+    func: Callable[[np.ndarray], float],
+    dim: int,
+    pop_size: int,
+    F: float = DE_BEST_1_BIN_F,
+    CR: float = DE_BEST_1_BIN_CR,
+    max_gen: int = 1000
+) -> Tuple[np.ndarray, float]:
+    """Differential Evolution DE/best/1/bin"""
     population = generate_population(pop_size, dim)
-    population = np.array(population)
+    fitness = np.array([func(ind) for ind in population])
 
-    max_gen = dim * 2000
-
-    # Hlavní smyčka algoritmu
     for gen in range(max_gen):
-        # Nalezení nejlepšího jedince
-        best_idx = np.argmin([func(ind) for ind in population])
+        # Najdi nejlepší jedince v populaci
+        best_idx = np.argmin(fitness)
         best = population[best_idx]
 
-        for i in range(len(population)):
-            # Výběr dvou různých indexů (r1, r2) náhodně z populace
-            candidates = list(range(0, i)) + list(range(i + 1, pop_size))
-            indexes = np.random.choice(candidates, 2, replace=False)
-            r1, r2 = population[indexes[0]], population[indexes[1]]
+        for i in range(pop_size):
+            # Výběr dvou různých jedinců
+            indices = list(range(pop_size))
+            indices.remove(i)
+            r1, r2 = population[np.random.choice(indices, 2, replace=False)]
 
             # Mutace
             mutant = best + F * (r1 - r2)
+            mutant = np.clip(mutant, LOWER_BOUND, UPPER_BOUND)
 
             # Binární křížení
-            trial = np.copy(population[i])
-            for j in range(dim):
-                if np.random.rand() < CR:
-                    trial[j] = mutant[j]
+            cross_points = np.random.rand(dim) < CR
+            if not np.any(cross_points):
+                cross_points[np.random.randint(0, dim)] = True
+            trial = np.where(cross_points, mutant, population[i])
 
-                # Kontrola hranic a upravení metodou odrazu
-                if trial[j] < lower_bound:
-                    trial[j] = lower_bound + abs(trial[j] - lower_bound)
-                elif trial[j] > upper_bound:
-                    trial[j] = upper_bound - abs(trial[j] - upper_bound)
+            # Vyhodnocení trial jedince
+            trial_fitness = func(trial)
 
-            # Selekcí
-            if func(trial) < func(population[i]):
+            # Selekce
+            if trial_fitness < fitness[i]:
                 population[i] = trial
+                fitness[i] = trial_fitness
 
-    # Nalezení a vrácení nejlepšího řešení
-    best_idx = np.argmin([func(ind) for ind in population])
-    return population[best_idx]
+    # Nalezení nejlepšího jedince
+    best_idx = np.argmin(fitness)
+    return population[best_idx], fitness[best_idx]
 
-
-# def pso(func, dim, pop_size, c1=1.49618, c2=1.49618, w=0.7298):
-#     # Inicializace populace (hejna)
-#     population = generate_population(pop_size, dim)
-#     population = np.array(population, dtype=np.float64)
-#     velocity = np.random.uniform(-abs(upper_bound - lower_bound), abs(upper_bound - lower_bound), (pop_size, dim))
-
-#     # Inicializace osobních a globálních nejlepších hodnot
-#     personal_best = population.copy()
-#     personal_best_scores = np.array([func(ind) for ind in population])
-#     global_best_idx = np.argmin(personal_best_scores)
-#     global_best = population[global_best_idx]
-
-#     max_gen = dim * 2000
-
-#     # Hlavní smyčka algoritmu PSO
-#     for gen in range(max_gen):
-#         for i in range(pop_size):
-#             # Aktualizace rychlosti
-#             r1, r2 = np.random.rand(dim), np.random.rand(dim)
-#             velocity[i] = w * velocity[i] + c1 * r1 * (personal_best[i] - population[i]) + c2 * r2 * (global_best - population[i])
-
-#             # Aktualizace pozice
-#             population[i] += velocity[i]
-
-#             # Kontrola hranic a upravení metodou odrazu
-#             for j in range(dim):
-#                 if population[i, j] < lower_bound:
-#                     population[i, j] = lower_bound + abs(population[i, j] - lower_bound)
-#                     velocity[i, j] *= -1
-#                 elif population[i, j] > upper_bound:
-#                     population[i, j] = upper_bound - abs(population[i, j] - upper_bound)
-#                     velocity[i, j] *= -1
-
-#             # Hodnocení a aktualizace osobních a globálních nejlepších hodnot
-#             score = func(population[i])
-#             if score < personal_best_scores[i]:
-#                 personal_best[i] = population[i]
-#                 personal_best_scores[i] = score
-
-#             # Aktualizace globálního nejlepšího
-#             if score < func(global_best):
-#                 global_best = population[i]
-
-#     # Nalezení a vrácení nejlepšího řešení
-#     best_idx = np.argmin(personal_best_scores)
-#     return population[best_idx]
-
-
-def pso(func, dim, pop_size, c1=1.49618, c2=1.49618, w=0.7298):
+def pso(
+    func: Callable[[np.ndarray], float],
+    dim: int,
+    pop_size: int,
+    c1: float = PSO_C1,
+    c2: float = PSO_C2,
+    w: float = PSO_W,
+    max_gen: int = 1000
+) -> Tuple[np.ndarray, float]:
+    """Particle Swarm Optimization (PSO)"""
+    # Inicializace populace a rychlosti
     population = generate_population(pop_size, dim)
-    population = np.array(population, dtype=np.float64)
-    # velocity = np.random.uniform(-abs(upper_bound - lower_bound), abs(upper_bound - lower_bound), (pop_size, dim))
+    velocity = np.zeros((pop_size, dim))
 
-    max_gen = dim * 2000
+    # Inicializace osobních a globálních nejlepších hodnot
+    fitness = np.array([func(ind) for ind in population])
+    personal_best_positions = population.copy()
+    personal_best_fitness = fitness.copy()
+    global_best_idx = np.argmin(fitness)
+    global_best_position = population[global_best_idx].copy()
+    global_best_fitness = fitness[global_best_idx]
 
-    # Initialize velocity for each individual
-    velocity = np.zeros((len(population), dim))
+    for gen in range(max_gen):
+        r1 = np.random.rand(pop_size, dim)
+        r2 = np.random.rand(pop_size, dim)
 
-    # Initialize personal best positions and their fitnesses
-    pbest_positions = np.copy(population)
-    pbest_fitness = np.array([func(ind) for ind in population])
+        # Aktualizace rychlosti
+        velocity = w * velocity + c1 * r1 * (personal_best_positions - population) + c2 * r2 * (global_best_position - population)
 
-    # Initialize global best position and its fitness
-    gbest_position = population[np.argmin(pbest_fitness)]
-    gbest_fitness = np.min(pbest_fitness)
+        # Aktualizace pozice
+        population += velocity
+        population = np.clip(population, LOWER_BOUND, UPPER_BOUND)
 
-    for t in range(max_gen):
-        for i, individual in enumerate(population):
-            # Update velocity
-            r1, r2 = np.random.rand(), np.random.rand()
-            velocity[i] = w * velocity[i] + \
-                c1 * r1 * (pbest_positions[i] - individual) + \
-                c2 * r2 * (gbest_position - individual)
+        # Vyhodnocení nové populace
+        fitness = np.array([func(ind) for ind in population])
 
-            # Update position
-            population[i] = individual + velocity[i]
+        # Aktualizace osobních nejlepších
+        better_fitness_mask = fitness < personal_best_fitness
+        personal_best_positions[better_fitness_mask] = population[better_fitness_mask]
+        personal_best_fitness[better_fitness_mask] = fitness[better_fitness_mask]
 
-            # Update personal best
-            fitness = func(population[i])
-            if fitness < pbest_fitness[i]:
-                pbest_fitness[i] = fitness
-                pbest_positions[i] = np.copy(population[i])
+        # Aktualizace globálního nejlepšího
+        current_global_best_idx = np.argmin(personal_best_fitness)
+        current_global_best_fitness = personal_best_fitness[current_global_best_idx]
+        if current_global_best_fitness < global_best_fitness:
+            global_best_fitness = current_global_best_fitness
+            global_best_position = personal_best_positions[current_global_best_idx].copy()
 
-                # Update global best
-                if fitness < gbest_fitness:
-                    gbest_fitness = fitness
-                    gbest_position = np.copy(population[i])
+    return global_best_position, global_best_fitness
 
-    return gbest_position
+def run_single_test(
+    func: Callable[[np.ndarray], float],
+    dim: int,
+    pop_size: int,
+    max_gen: int,
+    algorithms: List[Callable]
+) -> Dict[str, float]:
+    """Runs all algorithms for a single function, dimension, and population size."""
+    results = {}
+    solutions = {}
+    for algorithm in algorithms:
+        solution, fitness = algorithm(func, dim, pop_size, max_gen=max_gen)
+        results[algorithm.__name__] = fitness
+        # Převést řešení na řetězec pro uložení do CSV
+        solutions[algorithm.__name__ + '_solution'] = ','.join(map(str, solution))
+    # Kombinace výsledků a řešení do jednoho slovníku
+    combined_results = {}
+    for alg in algorithms:
+        combined_results[alg.__name__] = results[alg.__name__]
+        combined_results[alg.__name__ + '_solution'] = solutions[alg.__name__ + '_solution']
+    return combined_results
 
+def process_task(task: Tuple[Callable, int, int, int, List[Callable], int]) -> Dict[str, float]:
+    """
+    Procesní funkce pro běh jednotlivých testů.
+    Musí být na úrovni modulu pro multiprocessing.
+    """
+    func, dim, pop_size, max_gen, algorithms, repeat = task
+    print(f"Running Repeat {repeat}/{REPEATS}: Function: {func.__name__}, Dimension: {dim}, Population Size: {pop_size}")
+    fitness_results = run_single_test(func, dim, pop_size, max_gen, algorithms)
+    record = {
+        'Function': func.__name__,
+        'Dimension': dim,
+        'Population Size': pop_size,
+        'Repeat': repeat
+    }
+    # Přidání fitness a solution pro každý algoritmus
+    for key, value in fitness_results.items():
+        record[key] = value
+    return record
 
-dim_count = 2
-pop_count = 10
+def run_all_tests(
+    functions: List[Callable[[np.ndarray], float]],
+    dimensions: List[int],
+    pop_sizes: Dict[int, int],
+    FEs: Dict[int, int],
+    repeats: int,
+    algorithms: List[Callable]
+) -> pd.DataFrame:
+    """Runs all tests across functions, dimensions, population sizes, algorithms and repeats."""
+    records = []
 
+    # Vytvoření seznamu úkolů
+    tasks = []
+    for dim in dimensions:
+        pop_size = pop_sizes[dim]
+        max_gen = FEs[dim] // pop_size
+        for func in functions:
+            for repeat in range(repeats):
+                tasks.append((func, dim, pop_size, max_gen, algorithms, repeat + 1))
 
-def evaluate_de_rand_1_bin(function, dim_count, pop_count):
-    return de_rand_1_bin(function, dim_count, pop_count), function.__name__
+    # Paralelizace pomocí multiprocessing.Pool
+    with multiprocessing.Pool() as pool:
+        for record in pool.imap_unordered(process_task, tasks):
+            records.append(record)
 
+    # Vytvoření DataFrame
+    df = pd.DataFrame(records)
+    return df
 
-def evaluate_de_best_1_bin(function, dim_count, pop_count):
-    return de_best_1_bin(function, dim_count, pop_count), function.__name__
+def rank_algorithms(df: pd.DataFrame, algorithms: List[str], dim: int) -> pd.DataFrame:
+    """Ranks algorithms for each function based on their fitness."""
+    subset = df[df['Dimension'] == dim]
+    # Vybrat pouze fitness hodnoty pro algoritmy
+    alg_columns = [alg for alg in algorithms]
+    # Nižší fitness znamená lepší rank
+    ranks = subset.groupby('Function')[alg_columns].mean().rank(method='average', ascending=True)
+    return ranks
 
+def calculate_average_ranks(ranks: pd.DataFrame, algorithms: List[str]) -> Dict[str, float]:
+    """Calculates average ranks for each algorithm."""
+    avg_ranks = ranks.mean()
+    return avg_ranks.to_dict()
+
+def select_top_functions(df: pd.DataFrame, algorithms: List[str], dim: int, top_n: int = 5) -> List[str]:
+    """Selects top_n functions with the largest differences in algorithm rankings for a given dimension."""
+    ranks = rank_algorithms(df, algorithms, dim)
+    # Vypočítat rozdíl mezi nejlepším a nejhorším rankem pro každou funkci
+    rank_diff = ranks.max(axis=1) - ranks.min(axis=1)
+    # Vybrat top_n funkcí s největším rozdílem
+    top_functions = rank_diff.nlargest(top_n).index.tolist()
+    return top_functions
+
+def perform_friedman_test(df: pd.DataFrame, algorithms: List[str], dim: int) -> Tuple[float, float]:
+    """Performs Friedman test for a specific dimension."""
+    subset = df[df['Dimension'] == dim]
+    # Shromažďujeme fitness výsledky pro algoritmy
+    alg_results = [subset[alg].values for alg in algorithms]
+    # Friedmanův test
+    stat, p = friedmanchisquare(*alg_results)
+    return stat, p
+
+def main():
+    """Hlavní funkce pro spuštění všech testů a analýzu výsledků."""
+    # Definice parametrů
+    dimensions = [2]
+    pop_sizes = POP_SIZES
+    FEs_dict = FEs
+    repeats = REPEATS
+    algorithms = [de_rand_1_bin, de_best_1_bin, pso]
+    algorithm_names = [alg.__name__ for alg in algorithms]
+
+    # Spuštění všech testů
+    print("Spouštím všechny testy. Tento proces může chvíli trvat...")
+    df = run_all_tests(functions, dimensions, pop_sizes, FEs_dict, repeats, algorithms)
+    print("Testy dokončeny.")
+
+    # Uložení výsledků do CSV pro případnou další analýzu
+    df.to_csv('optimization_results.csv', index=False)
+    print("Výsledky byly uloženy do 'optimization_results.csv'.")
+
+    # Statistická analýza pomocí Friedmanova testu
+    print("\nProvádím Friedmanův rank test pro každou dimenzi...")
+    for dim in dimensions:
+        print(f"\nDimension: {dim}")
+        # Shromažďujeme fitness výsledky pro algoritmy
+        alg_results = [df[df['Dimension'] == dim][alg].values for alg in algorithm_names]
+        # Friedmanův test
+        stat, p = friedmanchisquare(*alg_results)
+        print(f"Friedman test statistic: {stat:.4f}, p-value: {p:.4f}")
+        if p < 0.05:
+            print("Existují statisticky významné rozdíly mezi algoritmy.")
+        else:
+            print("Neexistují statisticky významné rozdíly mezi algoritmy.")
+
+    # Určení pořadí algoritmů a výběr klíčových funkcí
+    print("\nUrčuji pořadí algoritmů a vybírám klíčové funkce...")
+    for dim in dimensions:
+        print(f"\nDimension: {dim}")
+        # Vytvoření DataFrame s rankingy
+        ranks = rank_algorithms(df, algorithm_names, dim)
+        # Výpočet průměrného ranku pro každý algoritmus
+        avg_ranks = calculate_average_ranks(ranks, algorithm_names)
+        print("Průměrné ranky algoritmů:")
+        for alg, rank in avg_ranks.items():
+            print(f"{alg}: {rank:.2f}")
+        # Výběr top 5 funkcí s největším rozdílem v rankingu
+        top_functions = select_top_functions(df, algorithm_names, dim, top_n=5)
+        print(f"Top 5 funkcí s největším rozdílem v rankingu algoritmů pro dimenzi {dim}:")
+        for func in top_functions:
+            print(f"- {func}")
+        # Můžeš zde přidat kód pro odůvodnění na základě vlastního chápání
 
 if __name__ == "__main__":
-    print("----------------- DE RAND/1/BIN -----------------")
-
-    for x, function in enumerate(funcs):
-        print(f"{x}.", pso(function, dim_count, pop_count), function.__name__)
-
-    # for x, function in enumerate(funcs):
-    # print(f"{x}.", de_rand_1_bin(function, dim_count, pop_count), function.__name__)
-
-    # with ProcessPoolExecutor() as executor:
-    #     futures = [executor.submit(evaluate_de_rand_1_bin, function, dim_count, pop_count) for function in funcs]
-    #     for x, future in enumerate(futures):
-    #         result, name = future.result()
-    #         print(f"{x}. {result} {name}")
-
-    # print("----------------- DE BEST/1/BIN -----------------")
-
-    # with ProcessPoolExecutor() as executor:
-    #     futures = [executor.submit(evaluate_de_best_1_bin, function, dim_count, pop_count) for function in funcs]
-    #     for x, future in enumerate(futures):
-    #         result, name = future.result()
-    #         print(f"{x}. {result} {name}")
-
-    # for x, function in enumerate(funcs):
-    #     print(f"{x}.",de_best_1_bin(function, dim_count, pop_count), function.__name__)
+    main()
